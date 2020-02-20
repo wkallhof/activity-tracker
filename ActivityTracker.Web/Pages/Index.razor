@@ -1,0 +1,70 @@
+﻿@page "/"
+
+@using ActivityTracker.Core.Features.ActivityTracking
+@using System.Timers
+@inject IActivityService ActivityService
+
+<h1>Activity Logs</h1>
+
+<p>This component demonstrates fetching data from a service.</p>
+
+@if (ActivityLogEntries == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Application Title</th>
+                <th>Window Title</th>
+                <th>Screenshots</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var log in ActivityLogEntries)
+            {
+                <tr>
+                    <td>@log.Entry.StartDateTime.ToLocalTime().ToLongTimeString()</td>
+                    <td>@(log.Entry.EndDateTime.HasValue? log.Entry.EndDateTime.Value.ToLocalTime().ToLongTimeString() : "N/A")</td>
+                    <td>@log.Entry.ApplicationTitle</td>
+                    <td>@log.Entry.WindowTitle.Substring(0, Math.Min(log.Entry.WindowTitle.Length, 100))</td>
+                    <td>
+                        @if(log.Entry.Screenshots != null && log.Entry.Screenshots.Any(x => x?.Data != null)){
+                            @foreach (var screenshot in log.Entry.Screenshots.Where(x => x?.Data != null))
+                            {
+                                <img src="data:image/png;base64, @(Convert.ToBase64String(screenshot.Data))" height="200"/>
+                            }
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    public IEnumerable<LogEntryViewState> ActivityLogEntries;
+
+    public bool DisplayStuff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ActivityLogEntries = (await ActivityService.GetAllActivityLogEntriesAsync()).Select(MapActivityLogEntryToViewState);
+    }
+
+    public LogEntryViewState MapActivityLogEntryToViewState(ActivityLogEntry entry){
+        return new LogEntryViewState(){
+            Entry = entry,
+            DisplayScreenshots = false,
+        };
+    }
+
+    public class LogEntryViewState{
+        public ActivityLogEntry Entry {get;set;}
+        public bool DisplayScreenshots {get;set;}
+    }
+}
