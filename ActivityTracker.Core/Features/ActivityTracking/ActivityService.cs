@@ -16,6 +16,7 @@ namespace ActivityTracker.Core.Features.ActivityTracking
          Task<ActivityLogEntry> EndActivityLogEntryAsync(ActivityLogEntry entry);
          Task<ActivityLogEntry> UpdateActivityLogAsync(ActivityLogEntry entry);
          Task<IEnumerable<ActivityLogEntry>> GetAllActivityLogEntriesAsync();
+         Task<ActivityLogSearchResponse> SearchActivityLogEntriesAsync(ActivityLogSearchRequest request);
          Task<int> CountLoggedActivitiesAsync();
     }
 
@@ -125,6 +126,38 @@ namespace ActivityTracker.Core.Features.ActivityTracking
             results = results.Distinct();
 
             return results;
+        }
+
+        /*
+            var query = $@"SELECT * FROM {Tables.ActivityLogEntries}
+                WHERE
+                    ({nameof(ActivityLogEntry.ApplicationTitle)} LIKE '%@{nameof(request.SearchText)}%' OR {nameof(ActivityLogEntry.WindowTitle)} LIKE '%@{nameof(request.SearchText)}%')
+                    AND ('@{nameof(request.StartDateTime)}' is null OR {nameof(ActivityLogEntry.StartDateTime)} >= '@{nameof(request.StartDateTime)}')
+                    ('@{nameof(request.EndDateTime)}' is null OR {nameof(ActivityLogEntry.StartDateTime)} <= '@{nameof(request.EndDateTime)}')
+
+                ORDER BY {nameof(ActivityLogEntry.StartDateTime)};";
+                */
+
+        public async Task<ActivityLogSearchResponse> SearchActivityLogEntriesAsync(ActivityLogSearchRequest request)
+        {
+            var searchParams = new {
+                SearchText = $"%{request.SearchText}%",
+                StartDateTime = request.StartDateTime?.ToUniversalTime(),
+                EndDateTime = request.EndDateTime?.ToUniversalTime(),
+            };
+
+            var query = $@"SELECT * FROM {Tables.ActivityLogEntries}
+                WHERE 
+                    ({nameof(ActivityLogEntry.ApplicationTitle)} LIKE @{nameof(searchParams.SearchText)} OR {nameof(ActivityLogEntry.WindowTitle)} LIKE @{nameof(searchParams.SearchText)})
+                    AND (@{nameof(searchParams.StartDateTime)} is null OR {nameof(ActivityLogEntry.StartDateTime)} >= @{nameof(searchParams.StartDateTime)})
+                    AND (@{nameof(searchParams.EndDateTime)} is null OR {nameof(ActivityLogEntry.StartDateTime)} <= @{nameof(searchParams.EndDateTime)})
+                ORDER BY {nameof(ActivityLogEntry.StartDateTime)};";
+                
+            var results = await _persistanceService.QueryAsync<ActivityLogEntry>(query,searchParams);
+
+            return new ActivityLogSearchResponse(){
+                Results = results.ToList()
+            };
         }
     }
 }

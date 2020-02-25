@@ -21,7 +21,7 @@ namespace ActivityTracker.Console
         private static ActivityLogEntry _currentLogEntry;
 
         private static Timer _activityTimer;
-        private static Timer _screenshotTimer;
+        // private static Timer _screenshotTimer;
         private static Timer _inactivityTimer;
 
         private static bool _userIsInactive;
@@ -39,7 +39,7 @@ namespace ActivityTracker.Console
             _log = _services.GetService<ILogger<Program>>();
 
             _activityTimer = new Timer(LogActivity, null, TimeSpan.Zero, TimeSpan.FromSeconds(ACTIVITY_CHECK_INTERVAL_IN_SECONDS));
-            _screenshotTimer = new Timer(TakeScreenshot, null, TimeSpan.Zero, TimeSpan.FromSeconds(SCREENSHOT_INTERVAL_IN_SECONDS));
+            // _screenshotTimer = new Timer(TakeScreenshot, null, TimeSpan.Zero, TimeSpan.FromSeconds(SCREENSHOT_INTERVAL_IN_SECONDS));
             _inactivityTimer = new Timer(CheckInactivity, null, TimeSpan.Zero, TimeSpan.FromSeconds(INACTIVITY_CHECK_INTERVAL_IN_SECONDS));
 
             Thread.Sleep(Timeout.Infinite);
@@ -47,7 +47,7 @@ namespace ActivityTracker.Console
 
         private static void HandleAppClosing(){
             _activityTimer.Dispose();
-            _screenshotTimer.Dispose();
+            // _screenshotTimer.Dispose();
             _inactivityTimer.Dispose();
 
             if(_currentLogEntry == null)
@@ -132,7 +132,7 @@ namespace ActivityTracker.Console
             {
                 _log.LogInformation("User has become inactive");
                 _activityTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                _screenshotTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                // _screenshotTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 if(_currentLogEntry != null){
                     _ = activityService.EndActivityLogEntryAsync(_currentLogEntry).Result;
                     _currentLogEntry = null;
@@ -142,7 +142,7 @@ namespace ActivityTracker.Console
             }
             else if(inactivity.Value.TotalSeconds <= INACTIVITY_THRESHOLD_IN_SECONDS && _userIsInactive){
                 _activityTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(ACTIVITY_CHECK_INTERVAL_IN_SECONDS));
-                _screenshotTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(SCREENSHOT_INTERVAL_IN_SECONDS));
+                // _screenshotTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(SCREENSHOT_INTERVAL_IN_SECONDS));
                 _log.LogInformation("User has become active");
                 _userIsInactive = false;
             }

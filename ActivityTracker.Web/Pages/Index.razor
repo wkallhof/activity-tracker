@@ -1,45 +1,46 @@
 ﻿@page "/"
 
 @using ActivityTracker.Core.Features.ActivityTracking
-@using System.Timers
 @inject IActivityService ActivityService
 
 <h1>Activity Logs</h1>
 
-<p>This component demonstrates fetching data from a service.</p>
-
-@if (ActivityLogEntries == null)
+@if (_logEntries == null)
 {
     <p><em>Loading...</em></p>
 }
 else
 {
+    <EditForm Model="@_searchRequest" OnValidSubmit="UpdateEntries">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        Search Text : <InputText id="name" @bind-Value="_searchRequest.SearchText" />
+        Start <input @bind="_searchRequest.StartDateTime" @bind:format="yyyy-MM-ddTHH:mm" type="datetime-local"/>
+        End <input @bind="_searchRequest.EndDateTime" @bind:format="yyyy-MM-ddTHH:mm" type="datetime-local"/>
+
+        <button type="submit">Submit</button>
+    </EditForm>
+
     <table class="table">
         <thead>
             <tr>
+                <th>Day</th>
                 <th>Start Time</th>
                 <th>End Time</th>
                 <th>Application Title</th>
                 <th>Window Title</th>
-                <th>Screenshots</th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var log in ActivityLogEntries)
+            @foreach (var log in _logEntries)
             {
                 <tr>
-                    <td>@log.Entry.StartDateTime.ToLocalTime().ToLongTimeString()</td>
-                    <td>@(log.Entry.EndDateTime.HasValue? log.Entry.EndDateTime.Value.ToLocalTime().ToLongTimeString() : "N/A")</td>
-                    <td>@log.Entry.ApplicationTitle</td>
-                    <td>@log.Entry.WindowTitle.Substring(0, Math.Min(log.Entry.WindowTitle.Length, 100))</td>
-                    <td>
-                        @if(log.Entry.Screenshots != null && log.Entry.Screenshots.Any(x => x?.Data != null)){
-                            @foreach (var screenshot in log.Entry.Screenshots.Where(x => x?.Data != null))
-                            {
-                                <img src="data:image/png;base64, @(Convert.ToBase64String(screenshot.Data))" height="200"/>
-                            }
-                        }
-                    </td>
+                    <td>@log.StartDateTime.ToLocalTime().ToShortDateString()</td>
+                    <td>@log.StartDateTime.ToLocalTime().ToLongTimeString()</td>
+                    <td>@(log.EndDateTime.HasValue? log.EndDateTime.Value.ToLocalTime().ToLongTimeString() : "N/A")</td>
+                    <td>@log.ApplicationTitle</td>
+                    <td>@log.WindowTitle.Substring(0, Math.Min(log.WindowTitle.Length, 100))</td>
                 </tr>
             }
         </tbody>
@@ -47,24 +48,21 @@ else
 }
 
 @code {
-    public IEnumerable<LogEntryViewState> ActivityLogEntries;
-
-    public bool DisplayStuff;
+    private IEnumerable<ActivityLogEntry> _logEntries;
+    private ActivityLogSearchRequest _searchRequest;
 
     protected override async Task OnInitializedAsync()
     {
-        ActivityLogEntries = (await ActivityService.GetAllActivityLogEntriesAsync()).Select(MapActivityLogEntryToViewState);
-    }
-
-    public LogEntryViewState MapActivityLogEntryToViewState(ActivityLogEntry entry){
-        return new LogEntryViewState(){
-            Entry = entry,
-            DisplayScreenshots = false,
+        _searchRequest = new ActivityLogSearchRequest(){
+            StartDateTime = DateTime.Now.AddDays(-1).Date,
+            EndDateTime = DateTime.Now.AddDays(1).Date
         };
+
+        await UpdateEntries();
     }
 
-    public class LogEntryViewState{
-        public ActivityLogEntry Entry {get;set;}
-        public bool DisplayScreenshots {get;set;}
+    private async Task UpdateEntries()
+    {
+        _logEntries = (await ActivityService.SearchActivityLogEntriesAsync(_searchRequest))?.Results;
     }
 }

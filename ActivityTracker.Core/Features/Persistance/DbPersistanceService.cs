@@ -9,6 +9,9 @@ using FluentMigrator.Runner;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using static System.Environment;
+using System.Data.Common;
+using StackExchange.Profiling;
+using StackExchange.Profiling.Data;
 
 namespace ActivityTracker.Core.Features.Persistance
 {
@@ -23,7 +26,11 @@ namespace ActivityTracker.Core.Features.Persistance
 
     public class SqliteDbPersistanceService : IDbPersistanceService
     {
-        private string _connectionString = $"Data Source={Path.Join(GetFolderPath(SpecialFolder.ApplicationData), "/ActivityTracker.db")}";
+        private static string _connectionString = $"Data Source={Path.Join(GetFolderPath(SpecialFolder.ApplicationData), "/ActivityTracker.db")}";
+
+        public SqliteDbPersistanceService(){
+             //MiniProfiler.StartNew("DB Profiler");
+        }
 
         public void RunMigrations(IServiceProvider serviceProvider)
         {
@@ -33,23 +40,29 @@ namespace ActivityTracker.Core.Features.Persistance
         }
 
         public async Task<T> QuerySingleAsync<T>(string query, object parameters = null){
-            using var db = new SqliteConnection(_connectionString);
+            using var db = GetConnection();
             return await db.QuerySingleAsync<T>(query, parameters);
         }
 
         public async Task<IEnumerable<T>> QueryAsync<T>(string query, object parameters = null){
-            using var db = new SqliteConnection(_connectionString);
+            using var db = GetConnection();
             return await db.QueryAsync<T>(query, parameters);
         }
 
         public async Task<IEnumerable<T1>> QueryAsync<T1, T2>(string query, Func<T1,T2,T1> map, object parameters = null){
-            using var db = new SqliteConnection(_connectionString);
+            using var db = GetConnection();
             return await db.QueryAsync<T1, T2, T1>(query, map, parameters);
         }
 
         public async Task ExecuteAsync(string query, object parameters = null){
-            using var db = new SqliteConnection(_connectionString);
+            using var db = GetConnection();
             await db.ExecuteAsync(query, parameters);
+        }
+
+        private static DbConnection GetConnection()
+        {
+            return new SqliteConnection(_connectionString);
+            //return new ProfiledDbConnection(connection, MiniProfiler.Current);
         }
     }
 
