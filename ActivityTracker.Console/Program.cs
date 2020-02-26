@@ -1,12 +1,18 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using System.Runtime.Loader;
+using System.Text.RegularExpressions;
 using System.Threading;
+using ActivityTracker.Console.Configuration;
 using ActivityTracker.Core.Features.ActivityTracking;
 using ActivityTracker.Core.Features.Persistance;
 using ActivityTracker.Core.Features.ProcessRunning;
 using ActivityTracker.Core.Features.Screenshots;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ActivityTracker.Console
 {
@@ -65,6 +71,17 @@ namespace ActivityTracker.Console
         {
             var services = new ServiceCollection();
 
+            var configurationBuilder = new ConfigurationBuilder()
+             .SetBasePath(Directory.GetCurrentDirectory());
+
+             foreach (var settingsFile in Directory.EnumerateFiles("Configuration", "*.json", SearchOption.AllDirectories))
+                configurationBuilder.AddJsonFile(settingsFile);
+
+            var configuration = configurationBuilder.Build();
+
+            services.Configure<ActivityTrackerSettings>(configuration.GetSection("ActivityTrackerSettings")); 
+            services.AddSingleton(r => r.GetRequiredService<IOptions<ActivityTrackerSettings>>().Value);
+
             services.AddDbPersistance();
 
             services.AddSingleton<IProcessRunner, ProcessRunner>();
@@ -76,6 +93,7 @@ namespace ActivityTracker.Console
                 return service;
             });
 
+            
             services.AddLogging(opt => 
             { 
                 opt.AddConsole(c =>
@@ -90,6 +108,7 @@ namespace ActivityTracker.Console
         static void LogActivity(object state){
             var activityService = _services.GetService<IActivityService>();
             var screenshotService = _services.GetService<IScreenshotService>();
+            var applicationSettings = _services.GetService<ActivityTrackerSettings>();
 
             var activity = activityService.GetCurrentWindowActivityAsync().Result;
 
@@ -103,6 +122,11 @@ namespace ActivityTracker.Console
 
             if(_currentLogEntry != null)
                 _ = activityService.EndActivityLogEntryAsync(_currentLogEntry).Result;
+
+            // exclude any activities that match our exclusion list
+            if(applicationSettings.ActivityRegexExclude.Any(x => 
+                Regex.IsMatch(activity.ApplicationTitle, x) || Regex.IsMatch(activity.WindowTitle, x)))
+                    return;
 
             _currentLogEntry = activityService.StartActivityLogEntryAsync(activity).Result;
             
