@@ -15,6 +15,7 @@ namespace ActivityTracker.Core.Features.ActivityTracking
          Task<ActivityLogEntry> StartActivityLogEntryAsync(Activity activity);
          Task<ActivityLogEntry> EndActivityLogEntryAsync(ActivityLogEntry entry);
          Task<ActivityLogEntry> UpdateActivityLogAsync(ActivityLogEntry entry);
+         Task DeleteActivityLogEntriesAsync(List<int> ids);
          Task<IEnumerable<ActivityLogEntry>> GetAllActivityLogEntriesAsync();
          Task<ActivityLogSearchResponse> SearchActivityLogEntriesAsync(ActivityLogSearchRequest request);
          Task<int> CountLoggedActivitiesAsync();
@@ -158,6 +159,13 @@ namespace ActivityTracker.Core.Features.ActivityTracking
             return new ActivityLogSearchResponse(){
                 Results = results.ToList()
             };
+        }
+
+        public async Task DeleteActivityLogEntriesAsync(List<int> ids){
+            var query = $@"DELETE FROM {Tables.ActivityLogEntries}
+                           WHERE {nameof(ActivityLogEntry.Id)} IN @Ids;";
+            
+            await _persistanceService.ExecuteAsync(query, new { Ids = ids });
         }
     }
 }
