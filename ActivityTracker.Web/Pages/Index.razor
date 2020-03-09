@@ -34,32 +34,35 @@ else
                     <th>Window Title</th>
                 </tr>
             </thead>
-            <tbody>
-                @foreach (var log in _logEntries)
-                {
-                    <tr>
-                        <td><input type="checkbox" @onchange="eventArgs => { log.Checked = (bool)eventArgs.Value; }" checked="@log.Checked"/></td>
-                        <td>@log.Entry.StartDateTime.ToLocalTime().ToShortDateString()</td>
-                        <td>@log.Entry.StartDateTime.ToLocalTime().ToLongTimeString()</td>
-                        <td>@(log.Entry.EndDateTime.HasValue? log.Entry.EndDateTime.Value.ToLocalTime().ToLongTimeString() : "N/A")</td>
-                        <td>@log.Entry.ApplicationTitle</td>
-                        <td>@log.Entry.WindowTitle.Substring(0, Math.Min(log.Entry.WindowTitle.Length, 100))</td>
-                    </tr>
-                }
-            </tbody>
+            
+            @foreach (var logDate in _logEntries.GroupBy(x => x.Entry.StartDateTime.Date))
+            {
+                <tbody>
+                    <tr><th colspan="100%">@logDate.Key.ToLocalTime().ToLongDateString()</th></tr>
+                    @foreach (var log in logDate)
+                    {
+                            <tr>
+                                <td><input type="checkbox" @onchange="eventArgs => { log.Checked = (bool)eventArgs.Value; }" checked="@log.Checked"/></td>
+                                <td>@log.Entry.StartDateTime.ToLocalTime().ToShortDateString()</td>
+                                <td>@log.Entry.StartDateTime.ToLocalTime().ToLongTimeString()</td>
+                                <td>@(log.Entry.EndDateTime.HasValue? log.Entry.EndDateTime.Value.ToLocalTime().ToLongTimeString() : "N/A")</td>
+                                <td>@log.Entry.ApplicationTitle</td>
+                                <td>@log.Entry.WindowTitle.Substring(0, Math.Min(log.Entry.WindowTitle.Length, 100))</td>
+                            </tr>
+                    }
+                </tbody>
+            }
+            
         </table>
     </EditForm>
 }
 
 @code {
     private List<LogEntryRow> _logEntries;
-    private Dictionary<int, LogEntryRow> _selectedLogEntries;
     private ActivityLogSearchRequest _searchRequest;
 
     protected override async Task OnInitializedAsync()
     {
-        _selectedLogEntries = new Dictionary<int, LogEntryRow>();
-
         _searchRequest = new ActivityLogSearchRequest(){
             StartDateTime = DateTime.Now.AddDays(-1).Date,
             EndDateTime = DateTime.Now.AddDays(1).Date
@@ -77,6 +80,7 @@ else
         var idsToDelete = _logEntries.Where(x => x.Checked).Select(x => x.Entry.Id.Value).Distinct().ToList();
 
         await ActivityService.DeleteActivityLogEntriesAsync(idsToDelete);
+        //await UpdateEntries();
         _logEntries = _logEntries.Where(x => !x.Checked).ToList();
     }
 

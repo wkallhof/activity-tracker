@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 using ActivityTracker.Core.Features.Screenshots;
 
 namespace ActivityTracker.Core.Features.ActivityTracking
@@ -12,8 +11,8 @@ namespace ActivityTracker.Core.Features.ActivityTracking
         public string WindowTitle {get;set;}
         public DateTime StartDateTime {get;set;}
         public DateTime? EndDateTime {get;set;}
+        public List<string> Categories {get;set;}
 
-        [JsonIgnore]
         public List<Screenshot> Screenshots {get;set;}
     }
 }

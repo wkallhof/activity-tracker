@@ -13,6 +13,7 @@ using ActivityTracker.Core.Features.ActivityTracking;
 using ActivityTracker.Core.Features.ProcessRunning;
 using ActivityTracker.Core.Features.Screenshots;
 using ActivityTracker.Core.Features.Persistance;
+using ActivityTracker.Core.Features.Categorizing;
 
 namespace ActivityTracker.Web
 {
@@ -33,8 +34,10 @@ namespace ActivityTracker.Web
             services.AddServerSideBlazor();
 
             services.AddDbPersistance();
+
             services.AddSingleton<IProcessRunner, ProcessRunner>();
             services.AddSingleton<IActivityService, BashActivityService>();
+            services.AddSingleton<ICategorizingService, CategorizingService>();
             services.AddSingleton<IScreenshotService, BashScreenshotService>();
             services.AddSingleton<IDbPersistanceService>((serviceProvider) => {
                 var service = new SqliteDbPersistanceService();

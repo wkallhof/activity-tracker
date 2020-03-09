@@ -2,16 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using System.Linq;
-using ActivityTracker.Core.Migrations;
 using Dapper;
 using FluentMigrator.Runner;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using static System.Environment;
 using System.Data.Common;
-using StackExchange.Profiling;
-using StackExchange.Profiling.Data;
+using ActivityTracker.Core.Features.Persistance.Migrations;
 
 namespace ActivityTracker.Core.Features.Persistance
 {
@@ -19,6 +16,7 @@ namespace ActivityTracker.Core.Features.Persistance
     {
          void RunMigrations(IServiceProvider serviceProvider);
         Task<T> QuerySingleAsync<T>(string query, object parameters = null);
+        Task<T> QuerySingleOrDefaultAsync<T>(string query, object parameters = null);
         Task<IEnumerable<T>> QueryAsync<T>(string query, object parameters = null);
         Task<IEnumerable<T1>> QueryAsync<T1, T2>(string query, Func<T1,T2,T1> map, object parameters = null);
         Task ExecuteAsync(string query, object parameters = null);
@@ -27,10 +25,6 @@ namespace ActivityTracker.Core.Features.Persistance
     public class SqliteDbPersistanceService : IDbPersistanceService
     {
         private static string _connectionString = $"Data Source={Path.Join(GetFolderPath(SpecialFolder.ApplicationData), "/ActivityTracker.db")}";
-
-        public SqliteDbPersistanceService(){
-             //MiniProfiler.StartNew("DB Profiler");
-        }
 
         public void RunMigrations(IServiceProvider serviceProvider)
         {
@@ -42,6 +36,11 @@ namespace ActivityTracker.Core.Features.Persistance
         public async Task<T> QuerySingleAsync<T>(string query, object parameters = null){
             using var db = GetConnection();
             return await db.QuerySingleAsync<T>(query, parameters);
+        }
+
+        public async Task<T> QuerySingleOrDefaultAsync<T>(string query, object parameters = null){
+            using var db = GetConnection();
+            return await db.QuerySingleOrDefaultAsync<T>(query, parameters);
         }
 
         public async Task<IEnumerable<T>> QueryAsync<T>(string query, object parameters = null){
@@ -59,11 +58,7 @@ namespace ActivityTracker.Core.Features.Persistance
             await db.ExecuteAsync(query, parameters);
         }
 
-        private static DbConnection GetConnection()
-        {
-            return new SqliteConnection(_connectionString);
-            //return new ProfiledDbConnection(connection, MiniProfiler.Current);
-        }
+        private static DbConnection GetConnection() => new SqliteConnection(_connectionString);
     }
 
     public static class DbPersistanceServiceProviderExtensions{

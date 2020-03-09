@@ -1,8 +1,7 @@
 using ActivityTracker.Core.Features.ActivityTracking;
-using ActivityTracker.Core.Features.Persistance;
 using FluentMigrator;
 
-namespace ActivityTracker.Core.Migrations
+namespace ActivityTracker.Core.Features.Persistance.Migrations
 {
     [Migration(202002142216)]
     public class CreateActivityLogEntriesTable : Migration

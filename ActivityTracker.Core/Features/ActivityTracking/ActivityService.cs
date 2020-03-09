@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ActivityTracker.Core.Features.Categorizing;
 using ActivityTracker.Core.Features.Persistance;
 using ActivityTracker.Core.Features.ProcessRunning;
 using ActivityTracker.Core.Features.Screenshots;
@@ -163,7 +164,10 @@ namespace ActivityTracker.Core.Features.ActivityTracking
 
         public async Task DeleteActivityLogEntriesAsync(List<int> ids){
             var query = $@"DELETE FROM {Tables.ActivityLogEntries}
-                           WHERE {nameof(ActivityLogEntry.Id)} IN @Ids;";
+                           WHERE {nameof(ActivityLogEntry.Id)} IN @Ids;
+                           
+                           DELETE FROM {Tables.ActivityLogEntryCategoryMapping}
+                           WHERE {nameof(ActivityLogEntryCategoryMapping.ActivityLogEntryId)} IN @Ids";
             
             await _persistanceService.ExecuteAsync(query, new { Ids = ids });
         }

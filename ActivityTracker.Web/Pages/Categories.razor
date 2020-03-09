@@ -1,0 +1,63 @@
+﻿@page "/categories"
+
+@using ActivityTracker.Core.Features.Categorizing
+@inject ICategorizingService CategorizingService
+
+<h1>Categories</h1>
+
+@if (_categories == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div>
+        Category Title : <input type="text" id="title" @bind="_categoryTitleInputValue" />
+        <button @onclick="CreateNewCategory">Create New</button>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var category in _categories)
+                {
+                    <tr>
+                        <td>@category.Title</td>
+                        <td><button @onclick="async () => { await DeleteCategory(category.Id);}">Delete</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Category> _categories;
+    private string _categoryTitleInputValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateEntries();
+    }
+
+    private async Task UpdateEntries()
+    {
+        _categories = (await CategorizingService.GetAllCategoriesAsync()).OrderByDescending(x => x.CreateDate).ToList();
+    }
+
+    private async Task DeleteCategory(int categoryId)
+    {
+        await CategorizingService.DeleteCategoryAsync(categoryId);
+        await UpdateEntries();
+    }
+
+    private async Task CreateNewCategory(){
+        await CategorizingService.CreateCategoryAsync(_categoryTitleInputValue);
+        _categoryTitleInputValue = string.Empty;
+        await UpdateEntries();
+    }
+}

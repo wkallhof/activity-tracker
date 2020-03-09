@@ -1,9 +1,7 @@
-using ActivityTracker.Core.Features.ActivityTracking;
-using ActivityTracker.Core.Features.Persistance;
 using ActivityTracker.Core.Features.Screenshots;
 using FluentMigrator;
 
-namespace ActivityTracker.Core.Migrations
+namespace ActivityTracker.Core.Features.Persistance.Migrations
 {
     [Migration(202002151200)]
     public class CreateScreenshotsTable : Migration
