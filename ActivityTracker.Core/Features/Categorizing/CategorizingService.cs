@@ -13,6 +13,7 @@ namespace ActivityTracker.Core.Features.Categorizing
         Task DeleteCategoryAsync(int? categoryId);
 
         Task CategorizeActivityLogEntry(int? entry, int? categoryId);
+        Task CategorizeActivityLogEntries(List<int> entries, int? categoryId);
     }
 
     public class CategorizingService : ICategorizingService
@@ -21,6 +22,38 @@ namespace ActivityTracker.Core.Features.Categorizing
 
         public CategorizingService(IDbPersistanceService persistanceService){
             _persistanceService = persistanceService;
+        }
+
+        public async Task CategorizeActivityLogEntries(List<int> entries, int? categoryId)
+        {
+            if(entries == null)
+                throw new ArgumentNullException($"Property {nameof(entries)} is required.");
+            
+            if(!entries.Any())
+                return;
+
+            if(!categoryId.HasValue)
+                throw new ArgumentNullException($"Property {nameof(categoryId)} is required.");
+
+            // exclude the existing mappings
+            var existingMappings = await FindActivityLogCategoryMappings(entries, categoryId.Value);
+            entries = entries.Except(existingMappings.Select(x => x.ActivityLogEntryId)).ToList();
+
+            var mappings = entries.Select(x => new ActivityLogEntryCategoryMapping(){
+                CategoryId = categoryId.Value,
+                ActivityLogEntryId = x
+            }).ToList();
+
+            var query = $@"
+                INSERT INTO {Tables.ActivityLogEntryCategoryMapping}
+                ({nameof(ActivityLogEntryCategoryMapping.CategoryId)}, 
+                {nameof(ActivityLogEntryCategoryMapping.ActivityLogEntryId)})
+
+                VALUES(@{nameof(ActivityLogEntryCategoryMapping.CategoryId)},
+                @{nameof(ActivityLogEntryCategoryMapping.ActivityLogEntryId)});";
+
+            await _persistanceService.ExecuteAsync(query, mappings);
+
         }
 
         public async Task CategorizeActivityLogEntry(int? entryId, int? categoryId)
@@ -107,6 +140,15 @@ namespace ActivityTracker.Core.Features.Categorizing
                 AND {nameof(ActivityLogEntryCategoryMapping.CategoryId)} = @{nameof(categoryId)}";
 
             return await _persistanceService.QuerySingleOrDefaultAsync<ActivityLogEntryCategoryMapping>(findExistingCategoryMappingQuery, new { entryId, categoryId });
+        }
+
+        private async Task<IEnumerable<ActivityLogEntryCategoryMapping>> FindActivityLogCategoryMappings(List<int> entryIds, int categoryId){
+            var findExistingCategoryMappingQuery = $@"
+                SELECT * FROM {Tables.ActivityLogEntryCategoryMapping}
+                WHERE {nameof(ActivityLogEntryCategoryMapping.ActivityLogEntryId)} IN @{nameof(entryIds)}
+                AND {nameof(ActivityLogEntryCategoryMapping.CategoryId)} = @{nameof(categoryId)}";
+
+            return await _persistanceService.QueryAsync<ActivityLogEntryCategoryMapping>(findExistingCategoryMappingQuery, new { entryIds, categoryId });
         }
     }
 }

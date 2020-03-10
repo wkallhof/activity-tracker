@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using ActivityTracker.Core.Features.Categorizing;
 using ActivityTracker.Core.Features.Persistance;
 using ActivityTracker.Core.Features.ProcessRunning;
-using ActivityTracker.Core.Features.Screenshots;
 
 namespace ActivityTracker.Core.Features.ActivityTracking
 {
@@ -17,7 +16,6 @@ namespace ActivityTracker.Core.Features.ActivityTracking
          Task<ActivityLogEntry> EndActivityLogEntryAsync(ActivityLogEntry entry);
          Task<ActivityLogEntry> UpdateActivityLogAsync(ActivityLogEntry entry);
          Task DeleteActivityLogEntriesAsync(List<int> ids);
-         Task<IEnumerable<ActivityLogEntry>> GetAllActivityLogEntriesAsync();
          Task<ActivityLogSearchResponse> SearchActivityLogEntriesAsync(ActivityLogSearchRequest request);
          Task<int> CountLoggedActivitiesAsync();
     }
@@ -103,43 +101,6 @@ namespace ActivityTracker.Core.Features.ActivityTracking
             return await _persistanceService.QuerySingleAsync<int>(query);
         }
 
-        public async Task<IEnumerable<ActivityLogEntry>> GetAllActivityLogEntriesAsync()
-        {
-            var query = $@"SELECT * FROM {Tables.ActivityLogEntries}
-                LEFT JOIN {Tables.Screenshots}
-                on {Tables.Screenshots}.{nameof(Screenshot.ActivityLogEntryId)} = {Tables.ActivityLogEntries}.{nameof(ActivityLogEntry.Id)};";
-
-            var logDictionary = new Dictionary<int, ActivityLogEntry>();
-
-            var results = await _persistanceService.QueryAsync<ActivityLogEntry,Screenshot>(query, (entry, screenshot) => {
-                	ActivityLogEntry logEntry;
-                
-                	if (!logDictionary.TryGetValue(entry.Id.Value, out logEntry))
-                	{
-                    	logEntry = entry;
-                    	logEntry.Screenshots = new List<Screenshot>();
-                    	logDictionary.Add(logEntry.Id.Value, logEntry);
-                	}
-
-                	logEntry.Screenshots.Add(screenshot);
-                	return logEntry;
-            }, null);
-
-            results = results.Distinct();
-
-            return results;
-        }
-
-        /*
-            var query = $@"SELECT * FROM {Tables.ActivityLogEntries}
-                WHERE
-                    ({nameof(ActivityLogEntry.ApplicationTitle)} LIKE '%@{nameof(request.SearchText)}%' OR {nameof(ActivityLogEntry.WindowTitle)} LIKE '%@{nameof(request.SearchText)}%')
-                    AND ('@{nameof(request.StartDateTime)}' is null OR {nameof(ActivityLogEntry.StartDateTime)} >= '@{nameof(request.StartDateTime)}')
-                    ('@{nameof(request.EndDateTime)}' is null OR {nameof(ActivityLogEntry.StartDateTime)} <= '@{nameof(request.EndDateTime)}')
-
-                ORDER BY {nameof(ActivityLogEntry.StartDateTime)};";
-                */
-
         public async Task<ActivityLogSearchResponse> SearchActivityLogEntriesAsync(ActivityLogSearchRequest request)
         {
             var searchParams = new {
@@ -148,17 +109,33 @@ namespace ActivityTracker.Core.Features.ActivityTracking
                 EndDateTime = request.EndDateTime?.ToUniversalTime(),
             };
 
-            var query = $@"SELECT * FROM {Tables.ActivityLogEntries}
+            var query = $@"SELECT {Tables.ActivityLogEntries}.*, {Tables.Categories}.*
+                FROM {Tables.ActivityLogEntries}
+                    LEFT JOIN {Tables.ActivityLogEntryCategoryMapping} ON {Tables.ActivityLogEntries}.{nameof(ActivityLogEntry.Id)} = {Tables.ActivityLogEntryCategoryMapping}.{nameof(ActivityLogEntryCategoryMapping.ActivityLogEntryId)}
+                    LEFT JOIN {Tables.Categories} ON {Tables.Categories}.{nameof(Category.Id)} = {Tables.ActivityLogEntryCategoryMapping}.{nameof(ActivityLogEntryCategoryMapping.CategoryId)}
                 WHERE 
-                    ({nameof(ActivityLogEntry.ApplicationTitle)} LIKE @{nameof(searchParams.SearchText)} OR {nameof(ActivityLogEntry.WindowTitle)} LIKE @{nameof(searchParams.SearchText)})
-                    AND (@{nameof(searchParams.StartDateTime)} is null OR {nameof(ActivityLogEntry.StartDateTime)} >= @{nameof(searchParams.StartDateTime)})
-                    AND (@{nameof(searchParams.EndDateTime)} is null OR {nameof(ActivityLogEntry.StartDateTime)} <= @{nameof(searchParams.EndDateTime)})
-                ORDER BY {nameof(ActivityLogEntry.StartDateTime)};";
-                
-            var results = await _persistanceService.QueryAsync<ActivityLogEntry>(query,searchParams);
+                    ({Tables.ActivityLogEntries}.{nameof(ActivityLogEntry.ApplicationTitle)} LIKE @{nameof(searchParams.SearchText)} OR {Tables.ActivityLogEntries}.{nameof(ActivityLogEntry.WindowTitle)} LIKE @{nameof(searchParams.SearchText)})
+                    AND (@{nameof(searchParams.StartDateTime)} is null OR {Tables.ActivityLogEntries}.{nameof(ActivityLogEntry.StartDateTime)} >= @{nameof(searchParams.StartDateTime)})
+                    AND (@{nameof(searchParams.EndDateTime)} is null OR {Tables.ActivityLogEntries}.{nameof(ActivityLogEntry.StartDateTime)} <= @{nameof(searchParams.EndDateTime)})
+                ORDER BY {Tables.ActivityLogEntries}.{nameof(ActivityLogEntry.StartDateTime)};";
+            
+
+            var mapDictionary = new Dictionary<int, ActivityLogEntry>();
+            var results = await _persistanceService.QueryAsync<ActivityLogEntry, Category>(query,
+            (entry, category) => {
+                if(!mapDictionary.TryGetValue(entry.Id.Value, out var logEntry)){
+                    logEntry = entry;
+                    mapDictionary.Add(entry.Id.Value, logEntry);
+                }
+
+                if(category != null && category.Title != null)
+                    logEntry.Categories.Add(category.Title);
+                    
+                return logEntry;
+            }, searchParams);
 
             return new ActivityLogSearchResponse(){
-                Results = results.ToList()
+                Results = results.Distinct().ToList()
             };
         }
 

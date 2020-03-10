@@ -1,7 +1,10 @@
 ﻿@page "/"
 
 @using ActivityTracker.Core.Features.ActivityTracking
+@using ActivityTracker.Core.Features.Categorizing
+
 @inject IActivityService ActivityService
+@inject ICategorizingService CategorizingService
 
 <h1>Activity Logs</h1>
 
@@ -22,34 +25,56 @@ else
         <button type="submit">Submit</button>
 
         <button type="button" @onclick="@(async () => await DeleteSelectedLogEntries())">Delete</button>
+        
+        Category:
+        <select @bind="_selectedCategoryId">
+            <option value="">Select category ...</option>
+            @foreach(var category in _categories){
+                <option value="@category.Id">@category.Title</option>
+            }
+        </select>
+
+        <button type="button" @onclick="@(async () => await CategorizeSelectedLogEntries())">Apply Category</button>
     
         <table class="table">
             <thead>
                 <tr>
-                    <th></th>
-                    <th>Day</th>
+                    <th><input type="checkbox" @onchange="OnSelectAllChange"/></th>
                     <th>Start Time</th>
-                    <th>End Time</th>
+                    @* <th>End Time</th>
+                    <th>Duration</th> *@
                     <th>Application Title</th>
                     <th>Window Title</th>
+                    <th>Categories</th>
                 </tr>
             </thead>
             
-            @foreach (var logDate in _logEntries.GroupBy(x => x.Entry.StartDateTime.Date))
+            @foreach (var logDate in _logEntries.GroupBy(x => x.Entry.StartDateTime.ToLocalTime().Date))
             {
                 <tbody>
                     <tr><th colspan="100%">@logDate.Key.ToLocalTime().ToLongDateString()</th></tr>
                     @foreach (var log in logDate)
                     {
-                            <tr>
-                                <td><input type="checkbox" @onchange="eventArgs => { log.Checked = (bool)eventArgs.Value; }" checked="@log.Checked"/></td>
-                                <td>@log.Entry.StartDateTime.ToLocalTime().ToShortDateString()</td>
-                                <td>@log.Entry.StartDateTime.ToLocalTime().ToLongTimeString()</td>
-                                <td>@(log.Entry.EndDateTime.HasValue? log.Entry.EndDateTime.Value.ToLocalTime().ToLongTimeString() : "N/A")</td>
-                                <td>@log.Entry.ApplicationTitle</td>
-                                <td>@log.Entry.WindowTitle.Substring(0, Math.Min(log.Entry.WindowTitle.Length, 100))</td>
-                            </tr>
+                        <tr title="@(log.Entry.EndDateTime.HasValue? (log.Entry.EndDateTime.Value - log.Entry.StartDateTime).TotalMinutes.ToString() : "N/A")">
+                            <td><input type="checkbox" @onchange="eventArgs => { log.Checked = (bool)eventArgs.Value; }" checked="@log.Checked"/></td>
+                            <td>@log.Entry.StartDateTime.ToLocalTime().ToLongTimeString()</td>
+                            @* <td>@(log.Entry.EndDateTime.HasValue? log.Entry.EndDateTime.Value.ToLocalTime().ToShortTimeString() : "N/A")</td>
+                            <td>@(log.Entry.EndDateTime.HasValue? (log.Entry.EndDateTime.Value - log.Entry.StartDateTime).TotalMinutes.ToString() : "N/A")</td> *@
+                            <td>@log.Entry.ApplicationTitle</td>
+                            <td>@log.Entry.WindowTitle.Substring(0, Math.Min(log.Entry.WindowTitle.Length, 100))</td>
+                            <td>@string.Join(", ", log.Entry.Categories) </td>
+                        </tr>
                     }
+                    <tr><th colspan="100%">
+                        <ul>
+                        @foreach(var category in logDate.SelectMany(x => x.Entry.Categories).Distinct()){
+                            
+                            <li>@category : @logDate.Where(x => x.Entry.EndDateTime.HasValue && x.Entry.Categories.Contains(category)).Select(x => x.Entry.EndDateTime.Value.Subtract(x.Entry.StartDateTime)).Aggregate(TimeSpan.Zero, (t1, t2) => t1 + t2).TotalHours.ToString("0.###") Hours</li>
+                        }
+                            <li>Uncategorized : @logDate.Where(x => x.Entry.EndDateTime.HasValue && !x.Entry.Categories.Any()).Select(x => x.Entry.EndDateTime.Value.Subtract(x.Entry.StartDateTime)).Aggregate(TimeSpan.Zero, (t1, t2) => t1 + t2).TotalHours.ToString("0.###") Hours</li>
+                            <li>Total : @logDate.Where(x => x.Entry.EndDateTime.HasValue).Select(x => x.Entry.EndDateTime.Value.Subtract(x.Entry.StartDateTime)).Aggregate(TimeSpan.Zero, (t1, t2) => t1 + t2).TotalHours.ToString("0.###") Hours</li>
+                        </ul>
+                    </th></tr>
                 </tbody>
             }
             
@@ -59,6 +84,9 @@ else
 
 @code {
     private List<LogEntryRow> _logEntries;
+    private List<Category> _categories;
+
+    private int? _selectedCategoryId;
     private ActivityLogSearchRequest _searchRequest;
 
     protected override async Task OnInitializedAsync()
@@ -67,6 +95,8 @@ else
             StartDateTime = DateTime.Now.AddDays(-1).Date,
             EndDateTime = DateTime.Now.AddDays(1).Date
         };
+
+        _categories = (await CategorizingService.GetAllCategoriesAsync()).ToList();
 
         await UpdateEntries();
     }
@@ -80,8 +110,27 @@ else
         var idsToDelete = _logEntries.Where(x => x.Checked).Select(x => x.Entry.Id.Value).Distinct().ToList();
 
         await ActivityService.DeleteActivityLogEntriesAsync(idsToDelete);
-        //await UpdateEntries();
         _logEntries = _logEntries.Where(x => !x.Checked).ToList();
+    }
+
+    private async Task CategorizeSelectedLogEntries(){
+        if(!_selectedCategoryId.HasValue)
+            return;
+
+        var idsToDelete = _logEntries.Where(x => x.Checked).Select(x => x.Entry.Id.Value).Distinct().ToList();
+
+        await CategorizingService.CategorizeActivityLogEntries(idsToDelete, _selectedCategoryId);
+        await UpdateEntries();
+    }
+
+    private void OnSelectAllChange(ChangeEventArgs eventArgs)
+    {
+        if((bool)eventArgs.Value){
+            _logEntries.ForEach(x => x.Checked = true);
+        }
+        else{
+            _logEntries.ForEach(x => x.Checked = false);
+        }
     }
 
     private class LogEntryRow{
