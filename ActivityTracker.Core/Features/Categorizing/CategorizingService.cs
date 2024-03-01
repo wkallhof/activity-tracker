@@ -12,8 +12,9 @@ namespace ActivityTracker.Core.Features.Categorizing
         Task<Category> CreateCategoryAsync(string title);
         Task DeleteCategoryAsync(int? categoryId);
 
-        Task CategorizeActivityLogEntry(int? entry, int? categoryId);
-        Task CategorizeActivityLogEntries(List<int> entries, int? categoryId);
+        Task CategorizeActivityLogEntry(int? entryId, int? categoryId);
+        Task CategorizeActivityLogEntries(List<int> entryIds, int? categoryId);
+        Task RemoveCategoryFromActivityLogEntires(List<int> entryIds, int? categoryId);
     }
 
     public class CategorizingService : ICategorizingService
@@ -131,6 +132,28 @@ namespace ActivityTracker.Core.Features.Categorizing
         {
             var query = $@"SELECT * From {Tables.Categories};";
             return await _persistanceService.QueryAsync<Category>(query);
+        }
+
+        public async Task RemoveCategoryFromActivityLogEntires(List<int> entryIds, int? categoryId)
+        {
+            if(entryIds == null)
+                throw new ArgumentNullException($"Property {nameof(entryIds)} is required.");
+            
+            if(!entryIds.Any())
+                return;
+
+            if(!categoryId.HasValue)
+                throw new ArgumentNullException($"Property {nameof(categoryId)} is required.");
+
+            var query = $@"
+                DELETE FROM {Tables.ActivityLogEntryCategoryMapping}
+                WHERE {nameof(ActivityLogEntryCategoryMapping.ActivityLogEntryId)} IN @{nameof(entryIds)}
+                AND {nameof(ActivityLogEntryCategoryMapping.CategoryId)} = @{nameof(categoryId)}";
+
+            await _persistanceService.ExecuteAsync(query, new{
+                entryIds,
+                categoryId
+            });
         }
 
         private async Task<ActivityLogEntryCategoryMapping> FindActivityLogCategoryMapping(int entryId, int categoryId){
